@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+  <changeSet id="004-initial-data" author="developer">
+
+    <insert tableName="cards">
+      <column name="card_id" value="b0396238-363d-4bb2-acdf-e117312078df"/>
+      <column name="user_id" value="12345"/>
+      <column name="status" value="ACTIVE"/>
+      <column name="balance" value="1000000000"/>
+      <column name="currency" value="UZS"/>
+      <column name="created_at" valueComputed="CURRENT_TIMESTAMP"/>
+      <column name="updated_at" valueComputed="CURRENT_TIMESTAMP"/>
+    </insert>
+
+    <insert tableName="cards">
+      <column name="card_id" value="a1234567-1234-1234-1234-123456789abc"/>
+      <column name="user_id" value="12345"/>
+      <column name="status" value="BLOCKED"/>
+      <column name="balance" value="500000"/>
+      <column name="currency" value="USD"/>
+      <column name="created_at" valueComputed="CURRENT_TIMESTAMP"/>
+      <column name="updated_at" valueComputed="CURRENT_TIMESTAMP"/>
+    </insert>
+
+  </changeSet>
+
+</databaseChangeLog>
