@@ -47,7 +47,6 @@ public class CbuServiceImpl implements CbuService {
           .filter(rate -> targetCurrency.equals(rate.get("Ccy")))
           .findFirst()
           .map(rate -> {
-            // "12650.96" → 1265096 (tiyin)
             double rateValue = Double.parseDouble(rate.get("Rate").toString());
             return Math.round(rateValue * 100);
           })
