@@ -177,6 +177,7 @@ public class TransactionServiceImpl implements TransactionService {
   }
 
   @Override
+  @Transactional
   public PageResponse getTransactions(UUID cardId, TransactionType type, int page, int size) {
     PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 

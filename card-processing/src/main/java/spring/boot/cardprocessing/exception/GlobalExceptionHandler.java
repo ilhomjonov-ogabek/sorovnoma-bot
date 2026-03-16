@@ -69,6 +69,7 @@ public class GlobalExceptionHandler {
         .collect(Collectors.joining(", "));
 
     log.warn("Validation failed for fields: {}", fields);
+
     return ResponseEntity
         .status(HttpStatus.BAD_REQUEST)
         .body(ErrorResponse.missingField(fields));

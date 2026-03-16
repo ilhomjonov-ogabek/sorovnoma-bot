@@ -29,8 +29,9 @@ public class Transaction {
   @Column(name = "external_id", nullable = false)
   private String externalId;
 
-  @ManyToOne(fetch = FetchType.LAZY)
+  @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "card_id", nullable = false)
+
   private Card card;
 
   @Enumerated(EnumType.STRING)

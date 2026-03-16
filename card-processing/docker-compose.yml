@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
 
   app:
@@ -8,12 +6,12 @@ services:
     ports:
       - "8081:8081"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/card_processing
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/postgres
       SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: 6379
-      JWT_SECRET: mySecretKey12345mySecretKey12345mySecretKey12345
+      SPRING_DATASOURCE_PASSWORD: Ogabek2006
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      JWT_SECRET: your-very-secret-key-minimum-32-characters-long
       JWT_EXPIRATION: 86400000
     depends_on:
       - postgres
@@ -25,9 +23,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: card_processing
+      POSTGRES_DB: postgres
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: Ogabek2006  # ← shu yerda
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
