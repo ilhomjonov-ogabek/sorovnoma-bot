@@ -15,6 +15,7 @@ private final WebClient webClient;
 
   @Override
   public Optional<TransactionDTO> getDTO(Long id) {
+
     TransactionDTO dto = webClient.get()
         .uri("/get-operation/{id}", id)
         .retrieve()

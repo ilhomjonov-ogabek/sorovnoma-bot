@@ -30,7 +30,6 @@ public class CbuServiceImpl implements CbuService {
     log.info("Fetching exchange rate from CBU: {} -> {}", from, to);
 
     try {
-      // CBU API ga so'rov
       List<Map<String, Object>> rates = webClient.get()
           .uri(cbuApiUrl)
           .retrieve()
@@ -42,7 +41,6 @@ public class CbuServiceImpl implements CbuService {
         throw new RuntimeException("CBU API returned empty response");
       }
 
-      // Qaysi valyuta kursini olish kerak
       String targetCurrency = from == Currency.USD ? "USD" : to.name();
 
       return rates.stream()
