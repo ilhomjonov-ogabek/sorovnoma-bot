@@ -6,11 +6,14 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 import spring.boot.cardprocessing.enums.Currency;
+import spring.boot.cardprocessing.exception.CbuServiceException;
 import spring.boot.cardprocessing.service.CbuService;
 
 @Service
@@ -33,6 +36,22 @@ public class CbuServiceImpl implements CbuService {
       List<Map<String, Object>> rates = webClient.get()
           .uri(cbuApiUrl)
           .retrieve()
+          .onStatus(
+              HttpStatusCode::is4xxClientError,
+              response -> Mono.error(
+                  new CbuServiceException(
+                      "Wrong request: " + response.statusCode()
+                  )
+              )
+          )
+          .onStatus(
+              HttpStatusCode::is5xxServerError,
+              response -> Mono.error(
+                  new CbuServiceException(
+                      "CBU service don't working: " + response.statusCode()
+                  )
+              )
+          )
           .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {
           })
           .block();

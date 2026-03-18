@@ -6,7 +6,9 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -72,7 +74,9 @@ public class CardController {
   public ResponseEntity<?> debit(@PathVariable UUID cardId,
       @RequestHeader("Idempotency-Key") String idempotencyKey,
       @Valid @RequestBody TransactionDto.DebitRequest request) {
+    log.info("Request <----- POST debit   : {}", cardId);
     TransactionDto.Response response = transactionService.debit(cardId, idempotencyKey, request);
+    log.info("Response -----> Debit succesfully finished   :{}", response);
     return ResponseEntity.ok(response);
   }
 
@@ -80,7 +84,9 @@ public class CardController {
   public ResponseEntity<?> credit(@PathVariable UUID cardId,
       @RequestHeader("Idempotency-Key") String idempotencyKey,
       @Valid @RequestBody TransactionDto.CreditRequest request) {
+    log.info("Request <----- POST credit   : {}", cardId);
     TransactionDto.Response response = transactionService.credit(cardId, idempotencyKey, request);
+    log.info("Response -----> Credit succesfully finished   :{}", response);
     return ResponseEntity.ok(response);
   }
 
@@ -89,8 +95,22 @@ public class CardController {
   public ResponseEntity<?> getTransactions(@PathVariable UUID cardId,
       @RequestParam(required = false) TransactionType type,
       @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
+    log.info("Request <----- GET transaction   : {}", cardId);
     PageResponse response = transactionService.getTransactions(cardId, type, page, size);
+    log.info("Response ----->  transaction   : {}", response);
     return ResponseEntity.ok(response);
+  }
+
+  @GetMapping("/get/check/{id}")
+  public ResponseEntity<?> getTransactionCheck(@PathVariable UUID id) {
+    log.info("Request <----- GET generate check   : {}", id);
+    byte[] check = transactionService.getCheck(id);
+    log.info("Response -----> Check generated   : {}", id);
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_PDF)
+        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=check-"+id+".pdf")
+        .contentLength(check.length)
+        .body(check);
   }
 
 

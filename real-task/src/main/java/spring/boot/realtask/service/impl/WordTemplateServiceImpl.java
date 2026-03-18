@@ -32,7 +32,7 @@ public class WordTemplateServiceImpl implements WordTemplateService {
 
     try {
 //      ClassPathResource resource = new ClassPathResource(dto.get().getTemplateId()+".docx");
-      ClassPathResource resource = new ClassPathResource("templates/"+dto.get().getTemplateId()+".docx");
+      ClassPathResource resource = new ClassPathResource("templates/template.docx");
 
       InputStream inputStream = resource.getInputStream();
 

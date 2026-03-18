@@ -55,7 +55,7 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ErrorResponse> handleEtagMismatch(EtagMismatchException ex) {
     log.warn("ETag mismatch: {}", ex.getMessage());
     return ResponseEntity
-        .status(HttpStatus.PRECONDITION_FAILED) // 412
+        .status(HttpStatus.PRECONDITION_FAILED)
         .body(ErrorResponse.invalidData(ex.getMessage()));
   }
 
@@ -82,6 +82,22 @@ public class GlobalExceptionHandler {
     return ResponseEntity
         .status(HttpStatus.BAD_REQUEST)
         .body(ErrorResponse.missingField(ex.getHeaderName()));
+  }
+
+  @ExceptionHandler(CheckGenerationException.class)
+  public ResponseEntity<ErrorResponse> handleCheckGeneration(CheckGenerationException ex) {
+    log.warn("Check generation: {}", ex.getMessage());
+    return ResponseEntity
+        .status(HttpStatus.BAD_GATEWAY)
+        .body(ErrorResponse.missingField(ex.getMessage()));
+  }
+
+  @ExceptionHandler(CbuServiceException.class)
+  public ResponseEntity<ErrorResponse> handleCbuApiError(CbuServiceException ex) {
+    log.warn("Cbu service error: {}", ex.getMessage());
+    return ResponseEntity
+        .status(HttpStatus.BAD_GATEWAY)
+        .body(ErrorResponse.missingField(ex.getMessage()));
   }
 
   @ExceptionHandler(Exception.class)

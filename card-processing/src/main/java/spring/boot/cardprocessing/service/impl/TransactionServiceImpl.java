@@ -2,12 +2,15 @@ package spring.boot.cardprocessing.service.impl;
 
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
+import spring.boot.cardprocessing.dto.CheckDTO;
 import spring.boot.cardprocessing.dto.TransactionDto;
 import spring.boot.cardprocessing.dto.TransactionDto.CreditRequest;
 import spring.boot.cardprocessing.dto.TransactionDto.DebitRequest;
@@ -24,6 +27,7 @@ import spring.boot.cardprocessing.repository.IdempotencyKeyRepository;
 import spring.boot.cardprocessing.repository.TransactionRepository;
 import spring.boot.cardprocessing.service.CardService;
 import spring.boot.cardprocessing.service.CbuService;
+import spring.boot.cardprocessing.service.GenerateCheckService;
 import spring.boot.cardprocessing.service.TransactionService;
 
 
@@ -46,6 +50,7 @@ public class TransactionServiceImpl implements TransactionService {
   private final CardService cardService;
   private final CbuService cbuService;
   private final ObjectMapper objectMapper;
+  private final GenerateCheckService  generateCheckService;
 
 
   @Override
@@ -203,6 +208,32 @@ public class TransactionServiceImpl implements TransactionService {
     );
 
     return response;
+  }
+
+  @Override
+  public byte[] getCheck(UUID id) {
+    Optional<Transaction> byId = transactionRepository.findById(id);
+    if (!byId.isPresent()) {
+      throw new RuntimeException("Transaction not found");
+    }
+    Transaction transaction = byId.get();
+    CheckDTO checkDTO = CheckDTO.builder()
+        .operationId(1L)
+        .amount(BigDecimal.valueOf(transaction.getAmount()))
+        .date(LocalDate.from(transaction.getCreatedAt()))
+        .commission(BigDecimal.valueOf(0.1))
+        .receiverCard("9860350144425468")
+        .senderCard("9860350144425468")
+        .senderName("Ilhomjonov Ogabek")
+        .templateId(transaction.getExternalId())
+        .receiverName("Islomjonov Jaxongir")
+        .terminal(transaction.getExternalId())
+        .currency(String.valueOf(transaction.getCurrency()))
+        .build();
+    byte[] bytes = generateCheckService.generateCheck(checkDTO);
+
+
+    return bytes;
   }
 
 

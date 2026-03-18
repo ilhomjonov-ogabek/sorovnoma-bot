@@ -2,6 +2,8 @@ package spring.boot.cardprocessing.entity;
 
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import lombok.*;
 import org.hibernate.annotations.GenericGenerator;
 
@@ -31,7 +33,6 @@ public class Transaction {
 
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "card_id", nullable = false)
-
   private Card card;
 
   @Enumerated(EnumType.STRING)
@@ -52,7 +53,7 @@ public class Transaction {
   @Column(name = "purpose", nullable = true)
   private TransactionPurpose purpose;
 
-  @Column(name = "exchange_rate", nullable = true)
+  @Column(name = "exchange_rate")
   private Long exchangeRate;
 
   @Column(name = "created_at", nullable = false, updatable = false)
@@ -62,4 +63,18 @@ public class Transaction {
   public void prePersist() {
     this.createdAt = LocalDateTime.now();
   }
+
+
+
+/*  private Long operationId;
+  private BigDecimal amount;
+  private String currency;
+  private String templateId;
+  private String terminal;
+  private LocalDate date;
+  private String senderCard;
+  private String receiverCard;
+  private BigDecimal commission;
+  private String senderName;
+  private String receiverName;*/
 }

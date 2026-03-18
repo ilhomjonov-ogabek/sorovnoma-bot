@@ -20,4 +20,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
   Optional<Transaction> findByExternalId(String externalId);
 
   Page<Transaction> findAllByCard_CardIdAndType(UUID cardId, TransactionType type, Pageable pageable);
+
+  Optional<Object> findByTransactionId(UUID transactionId);
 }

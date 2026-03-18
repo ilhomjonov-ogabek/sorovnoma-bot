@@ -14,4 +14,5 @@ public interface TransactionService {
 
   TransactionDto.PageResponse getTransactions(UUID cardId, TransactionType type, int page, int size);
 
+  byte[] getCheck(UUID id);
 }
