@@ -30,20 +30,16 @@ public class GenerateCheckServiceImpl implements GenerateCheckService {
   private final TransactionEntityRepository transactionEntityRepository;
 
   @Override
-  public ResponseEntity<Resource> generateCheck(Long id) {
+  public byte[] generateCheck(Long id) {
     byte[] word;
     Optional<TransactionEntity> byOperationId = transactionEntityRepository.findByOperationId(id);
     if (byOperationId.isPresent()) {
       word =getWord(id);
     }else {
       Optional<TransactionDTO> dto = externalApiService.getDTO(id);
-      if (dto.isEmpty()) {
-        return ResponseEntity.notFound().build();
-      }
+
       word = wordTemplateService.editWord(dto);
-      if (word == null||word.length==0) {
-        return ResponseEntity.notFound().build();
-      }
+
       TransactionEntity entity = TransactionEntity.builder()
           .operationId(id)
           .date(dto.get().getDate())
@@ -60,32 +56,25 @@ public class GenerateCheckServiceImpl implements GenerateCheckService {
       transactionEntityRepository.save(entity);
     }
 
-
     byte[] pdfBytes = convertToPdfService.convertToPdf(word);
 
-    if (pdfBytes == null) {
-      return ResponseEntity.notFound().build();
-    }
-
-
-    return ResponseEntity.ok()
-        .contentType(MediaType.APPLICATION_PDF)
-        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=operation_"+id+".pdf")
-        .contentLength(pdfBytes.length)
-        .body(new ByteArrayResource(pdfBytes));
+    return pdfBytes;
   }
 
   @Override
   public ResponseEntity<Resource> generateCheck(Optional<TransactionDTO> dto) {
     byte[] word;
+
     Optional<TransactionEntity> byOperationId = transactionEntityRepository.findByOperationId(dto.get()
         .getOperationId());
+
     if (byOperationId.isPresent()) {
       word =getWord(dto.get().getOperationId());
     }else {
       if (dto.isEmpty()) {
         return ResponseEntity.notFound().build();
       }
+
       word = wordTemplateService.editWord(dto);
       if (word == null||word.length==0) {
         return ResponseEntity.notFound().build();

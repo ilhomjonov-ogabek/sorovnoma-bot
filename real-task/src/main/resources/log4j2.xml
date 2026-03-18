@@ -42,7 +42,7 @@
 
   <Loggers>
 
-    <Logger name="spring.boot.cardprocessing" level="DEBUG" additivity="false">
+    <Logger name="spring.boot.realtask" level="DEBUG" additivity="false">
       <AppenderRef ref="ConsoleAppender"/>
       <AppenderRef ref="FileAppender"/>
       <AppenderRef ref="ErrorFileAppender"/>

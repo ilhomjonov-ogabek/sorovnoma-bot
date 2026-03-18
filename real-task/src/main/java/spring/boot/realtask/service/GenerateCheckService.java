@@ -7,6 +7,6 @@ import spring.boot.realtask.dto.TransactionDTO;
 
 public interface GenerateCheckService {
 
-  ResponseEntity<Resource> generateCheck(Long id);
+  byte[] generateCheck(Long id);
   ResponseEntity<Resource> generateCheck(Optional<TransactionDTO> dto);
 }
