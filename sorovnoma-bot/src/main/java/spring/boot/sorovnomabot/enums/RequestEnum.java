@@ -27,5 +27,6 @@ public enum RequestEnum {
   DEFAULT,
   APPROVE_POLL,
   SUBSCRIBE,
+  NOT_APPROVED_POLL,
 
 }

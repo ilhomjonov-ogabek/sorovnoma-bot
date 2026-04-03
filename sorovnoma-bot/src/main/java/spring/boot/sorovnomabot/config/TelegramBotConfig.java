@@ -1,7 +1,11 @@
 package spring.boot.sorovnomabot.config;
 
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import java.io.Serializable;
+import java.util.List;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -14,17 +18,20 @@ import spring.boot.sorovnomabot.service.BotResponseService;
 import spring.boot.sorovnomabot.service.impl.AllMethodsService;
 import org.telegram.telegrambots.bots.DefaultBotOptions;
 
+@Slf4j
 @Component
 public class TelegramBotConfig extends TelegramLongPollingBot {
 
   private final AllMethodsService allMethodsService;
   private final BotResponseService botResponseService;
 
+
   public TelegramBotConfig(AllMethodsService allMethodsService,
       @Lazy BotResponseService botResponseService) {
     super(new DefaultBotOptions());
     this.allMethodsService = allMethodsService;
     this.botResponseService = botResponseService;
+
   }
 
 
@@ -51,7 +58,7 @@ public class TelegramBotConfig extends TelegramLongPollingBot {
     RequestEnum request = allMethodsService.requestCheckReturnEnum(update);
 
     switch (request) {
-      case START-> execute(botResponseService.pressStart(update));
+      case START -> botResponseService.pressStart(update);
       case SIMPLE_START -> execute(botResponseService.pressSimpleStart(update));
       case SEND_POLLS -> execute(botResponseService.pressActivePolls(update));
       case GET_RESULT -> execute(botResponseService.pressGetResult(update));
@@ -77,14 +84,17 @@ public class TelegramBotConfig extends TelegramLongPollingBot {
       case APPROVE_POLL -> execute(botResponseService.approvePoll(update));
       case DEFAULT -> execute(botResponseService.defaultMessage(update));
       case SUBSCRIBE -> execute(botResponseService.pressSubscribe(update));
+      case NOT_APPROVED_POLL -> execute(botResponseService.pressNotApprovedPoll(update));
     }
 
   }
 
   @Override
-  public <T extends Serializable, Method extends BotApiMethod<T>> T execute(Method method) throws TelegramApiException {
+  public <T extends Serializable, Method extends BotApiMethod<T>> T execute(Method method)
+      throws TelegramApiException {
     try {
-      java.lang.reflect.Field field = org.telegram.telegrambots.bots.DefaultAbsSender.class.getDeclaredField("objectMapper");
+      java.lang.reflect.Field field = org.telegram.telegrambots.bots.DefaultAbsSender.class.getDeclaredField(
+          "objectMapper");
       field.setAccessible(true);
 
       if (field.get(this) == null) {
@@ -95,5 +105,30 @@ public class TelegramBotConfig extends TelegramLongPollingBot {
     }
 
     return super.execute(method);
+  }
+
+  @PostConstruct
+  public void onStart() {
+    List<Long> adminsChatId = botResponseService.getAdminsChatId();
+    for (Long chatId : adminsChatId) {
+      try {
+        execute(botResponseService.sendToAdminsStart(chatId,"✅ Bot ishga tushdi!"));
+      } catch (TelegramApiException e) {
+        log.error("Adminga ✅ Bot ishga tushdi! messageda error:"+e.getMessage());
+      }
+
+    }
+  }
+
+  @PreDestroy
+  public void onStop() {
+    List<Long> adminsChatId = botResponseService.getAdminsChatId();
+    for (Long chatId : adminsChatId) {
+      try {
+        execute(botResponseService.sendToAdminsStop(chatId,"🔴 Bot o'chirilmoqda..."));
+      } catch (TelegramApiException e) {
+        log.error("Adminga 🔴 Bot o'chirilmoqda... messageda error:"+e.getMessage());
+      }
+    }
   }
 }

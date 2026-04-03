@@ -9,5 +9,8 @@ public interface PollRepository extends JpaRepository<Poll, Long> {
 
   List<Poll> findByActive(boolean active);
 
+  List<Poll> findByActiveAndChannelMessageIdIsNotNull(boolean active);
+
+
   List<Poll> findByActiveAndFinishedDateBefore(boolean b, LocalDate now);
 }

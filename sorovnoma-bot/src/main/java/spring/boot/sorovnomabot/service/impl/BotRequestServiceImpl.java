@@ -264,4 +264,12 @@ public class BotRequestServiceImpl implements BotRequestService {
     return update.getCallbackQuery().getData().startsWith("subscribe");
   }
 
+  @Override
+  public boolean pressNotApproved(Update update) {
+    if (!isCallback(update)) {
+      return false;
+    }
+    return update.getCallbackQuery().getData().equals("notApproved");
+  }
+
 }

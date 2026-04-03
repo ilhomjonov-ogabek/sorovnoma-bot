@@ -84,8 +84,9 @@ public class MessageSender {
       }
 
       InlineKeyboardButton button = new InlineKeyboardButton();
-      button.setText(candidate.getName() + "  " + formatted);
-      button.setCallbackData("vote" + "#" + candidateId + "#" + p.getId());
+      button.setText(candidate.getName() + " - " + formatted);
+      /*button.setCallbackData("vote" + "#" + candidateId + "#" + p.getId());*/
+      button.setCallbackData("notApproved");
       rows.add(List.of(button));
     }
 
@@ -127,6 +128,14 @@ public class MessageSender {
   public Long getBotId() {
     try {
       return bot.getMe().getId();
+    } catch (TelegramApiException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public Message sendPoll(SendPhoto sendPhoto) {
+    try {
+      return bot.execute(sendPhoto);
     } catch (TelegramApiException e) {
       throw new RuntimeException(e);
     }

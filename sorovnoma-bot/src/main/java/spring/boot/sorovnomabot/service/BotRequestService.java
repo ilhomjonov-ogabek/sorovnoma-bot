@@ -55,4 +55,6 @@ public interface BotRequestService {
   boolean equalsPhoto(Update update);
 
   boolean pressSubscribe(Update update);
+
+  boolean pressNotApproved(Update update);
 }

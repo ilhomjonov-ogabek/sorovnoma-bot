@@ -1,5 +1,6 @@
 package spring.boot.sorovnomabot.service;
 
+import java.util.List;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -8,7 +9,7 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 
 public interface BotResponseService {
 
-  SendPhoto pressStart(Update update);
+  void pressStart(Update update);
 
   BotApiMethod<?> pressVote(Update update);
 
@@ -57,4 +58,12 @@ public interface BotResponseService {
   SendMessage approvePoll(Update update);
 
   BotApiMethod<?> pressSubscribe(Update update);
+
+  BotApiMethod<?> pressNotApprovedPoll(Update update);
+
+  BotApiMethod<?> sendToAdminsStart(Long chatId,String s);
+
+  BotApiMethod<?> sendToAdminsStop(Long chatId,String s);
+
+  List<Long> getAdminsChatId();
 }

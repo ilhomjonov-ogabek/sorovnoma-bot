@@ -61,6 +61,8 @@ public class AllMethodsService {
       return RequestEnum.REMOVE_ADMIN;
     } else if (botRequestService.pressApprove(update)) {
       return RequestEnum.APPROVE_POLL;
+    } else if (botRequestService.pressNotApproved(update)) {
+      return RequestEnum.NOT_APPROVED_POLL;
     } else if (botRequestService.pressRemovedAdmin(update)) {
       return RequestEnum.REMOVED_ADMIN;
     } else if (botRequestService.pressSubscribe(update)) {

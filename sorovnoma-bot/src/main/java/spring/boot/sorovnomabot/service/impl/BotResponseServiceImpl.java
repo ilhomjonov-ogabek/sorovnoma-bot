@@ -7,12 +7,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -22,8 +20,8 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChat;
@@ -55,7 +53,6 @@ import spring.boot.sorovnomabot.repository.UserRepository;
 import spring.boot.sorovnomabot.service.BotResponseService;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class BotResponseServiceImpl implements BotResponseService {
 
@@ -80,8 +77,18 @@ public class BotResponseServiceImpl implements BotResponseService {
   @Value("${bot.username.new}")
   private String botUsername;
 
+  public BotResponseServiceImpl(UserRepository userRepository, PollRepository pollRepository,
+      CandidateRepository candidateRepository,@Lazy MessageSender messageSender,
+      PollCreationStateHolder stateHolder) {
+    this.userRepository = userRepository;
+    this.pollRepository = pollRepository;
+    this.candidateRepository = candidateRepository;
+    this.messageSender = messageSender;
+    this.stateHolder = stateHolder;
+  }
+
   @Override
-  public SendPhoto pressStart(Update update) {
+  public void pressStart(Update update) {
     Long chatId = update.getMessage().getChatId();
     log.info("pressStart chaqirildi: chatId={}", chatId);
 
@@ -106,19 +113,17 @@ public class BotResponseServiceImpl implements BotResponseService {
 
     if (poll.isEmpty()) {
       log.warn("So'rovnoma topilmadi: pollId={}", pollId);
-      messageSender.send(sendText(chatId, "❌❌Bunday so'rovnoma mavjud emas!!!!!"));
-      return null;
+      messageSender.send(sendText(chatId, "❌Bunday so'rovnoma mavjud emas!!!!!"));
     } else if (!poll.get().isActive()) {
       log.info("Yakunlangan so'rovnoma ochilmoqda: pollId={}", pollId);
       messageSender.send(sendText(chatId, "❌Bu so'rovnoma allaqachon yakunlangan!!!!!"));
-      return null;
-    }
+    } else {
 
-    return sendPoll(chatId, poll);
+      messageSender.sendPoll(sendPoll(chatId,poll));
+    }
   }
 
   @Override
-  @Transactional
   public BotApiMethod<?> pressVote(Update update) {
     Long chatId = update.getCallbackQuery().getMessage().getChatId();
     Integer messageId = update.getCallbackQuery().getMessage().getMessageId();
@@ -166,7 +171,7 @@ public class BotResponseServiceImpl implements BotResponseService {
       return sendMessage;
     }
 
-    if (poll.get().getFinishedDate().isBefore(LocalDate.now())) {
+    if (poll.get().getFinishedDate().isBefore(LocalDate.now())||!poll.get().isActive()) {
       log.info("Yakunlangan so'rovnomaga ovoz berishga urinish: pollId={}, chatId={}", pollId,
           chatId);
       sendMessage.setText("❌Bu so'rovnoma allaqachon yakunlangan!!" + "\n" +
@@ -184,7 +189,7 @@ public class BotResponseServiceImpl implements BotResponseService {
 
     if (usersId.contains(user.get().getId())) {
       log.info("Takroriy ovoz berish urinishi: chatId={}, pollId={}", chatId, pollId);
-      sendMessage.setText("🗿Siz allaqachon ovoz berib bo'lgansiz bu so'rovnomaga!!!");
+      sendMessage.setText("🗿Siz allaqachon ovoz bergansiz");
       return sendMessage;
     }
 
@@ -211,7 +216,7 @@ public class BotResponseServiceImpl implements BotResponseService {
 
     if (!(user.getRole() == UserRole.ADMIN || user.getRole() == UserRole.SUPER_ADMIN)) {
       log.warn("Ruxsatsiz admin panel urinishi: chatId={}, role={}", chatId, user.getRole());
-      sendMessage.setText("Nomalum so'rov‼️‼️");
+      sendMessage.setText("Nomalum so'rov!");
       return sendMessage;
     }
 
@@ -246,7 +251,7 @@ public class BotResponseServiceImpl implements BotResponseService {
     back.add(new KeyboardButton("🔚 Orqaga"));
     keyboard.getKeyboard().add(back);
 
-    sendMessage.setText("🥳🥳Admin panelga xush kelibsiz!!!!!");
+    sendMessage.setText("🥳Admin panelga xush kelibsiz!");
     sendMessage.setReplyMarkup(keyboard);
     return sendMessage;
   }
@@ -270,7 +275,7 @@ public class BotResponseServiceImpl implements BotResponseService {
     EditMessageText editMessageText = new EditMessageText();
 
     StringBuilder text = new StringBuilder();
-    text.append("📊 *").append(poll.getTitle()).append("*\n\n");
+    text.append("📊 ").append(poll.getTitle().toUpperCase()).append("\n\n");
     text.append("👥 Jami ovoz berganlar: ").append(poll.getUsersId().size()).append("\n\n");
     text.append("🏆 Natijalar:\n");
 
@@ -305,7 +310,7 @@ public class BotResponseServiceImpl implements BotResponseService {
     log.info("So'rovnoma yakunlandi: pollId={}", pollId);
 
     EditMessageText editMessageText = new EditMessageText();
-    editMessageText.setText("So'rovnoma muvoffaqiyatli yakunlandi✅✅");
+    editMessageText.setText("So'rovnoma muvaffaqiyatli yakunlandi✅");
     editMessageText.setChatId(chatId.toString());
     editMessageText.setMessageId(messageId);
     return editMessageText;
@@ -385,7 +390,7 @@ public class BotResponseServiceImpl implements BotResponseService {
 
     if (userRepository.findByChatId(chatId).get().getRole().equals(UserRole.USER)) {
       log.warn("Ruxsatsiz so'rovnoma yaratish urinishi: chatId={}", chatId);
-      return sendText(chatId, "Bu so'rov uchun ruxsat yoq‼️⛔");
+      return sendText(chatId, "Bu so'rov uchun ruxsat yo'q⛔");
     }
     stateHolder.put(chatId, PollCreateState.WAITING_PICTURE);
     pollDrafts.put(chatId, new Poll());
@@ -394,7 +399,7 @@ public class BotResponseServiceImpl implements BotResponseService {
     createPollStatus.put(chatId, true);
 
     return sendText(chatId, "📝 So'rovnoma rasmini kiriting:" + "\n"
-        + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+        + "So'rovnoma yaratishni bekor qilish uchun: /exit");
   }
 
   private BotApiMethod<?> editPoll(Long chatId, Optional<Poll> poll, Integer messageId) {
@@ -480,7 +485,7 @@ public class BotResponseServiceImpl implements BotResponseService {
 
     if (userRepository.findByChatId(chatId).get().getRole().equals(UserRole.USER)) {
       log.warn("Ruxsatsiz so'rovnoma yaratish urinishi: chatId={}", chatId);
-      return sendText(chatId, "Bu so'rov uchun ruxsat yoq‼️⛔");
+      return sendText(chatId, "Bu so'rov uchun ruxsat yo'q⛔");
     }
     String text;
     if (!update.getMessage().hasPhoto()) {
@@ -506,23 +511,24 @@ public class BotResponseServiceImpl implements BotResponseService {
         draft.setPictureId(text);
         stateHolder.put(chatId, PollCreateState.WAITING_TITLE);
         return sendText(chatId, "📝 So'rovnoma sarlavhasini kiriting:" + "\n"
-            + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+            + "So'rovnoma yaratishni bekor qilish uchun: /exit");
       }
       case WAITING_TITLE -> {
         if (update.getMessage().getText().equals("/exit")) {
           return pressExit(update);
         }
         if (!update.getMessage().hasText()) {
-          return sendText(chatId, "Xatolik iltimos text formatda ma'lumot kiriting‼️‼️" + "\n"
+          return sendText(chatId, "Xatolik iltimos text formatda ma'lumot kiriting!" + "\n"
               + "📝 So'rovnoma sarlavhasini kiriting:" + "\n"
-              + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+              + "So'rovnoma yaratishni bekor qilish uchun: /exit");
         }
         draft.setTitle(text);
         stateHolder.put(chatId, PollCreateState.WAITING_START_DATE);
         String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
         return sendText(chatId,
-            "📅 Boshlanish sanasini kiriting (yyyy-MM-dd):\n\nMasalan: `" + today + "`" + "\n"
-                + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+            "📅 Boshlanish sanasini kiriting (yyyy-MM-dd):\n\nMasalan: " + "'" + today + "'"
+                 + "\n"
+                + "So'rovnoma yaratishni bekor qilish uchun: /exit");
       }
       case WAITING_START_DATE -> {
         if (update.getMessage().getText().equals("/exit")) {
@@ -530,20 +536,20 @@ public class BotResponseServiceImpl implements BotResponseService {
         }
         try {
           if (LocalDate.parse(text).isBefore(LocalDate.now())) {
-            String text1 = "Xatolik kiritilgan sana bugungi sanadan keyin bo'lishi kerak‼️‼️" + "\n"
-                + "Bugungi sana:" + LocalDate.now() + "\n"
-                + "So'rovnoma yaratishni bekor qlish uchun: /exit";
+            String text1 = "Xatolik kiritilgan sana bugungi sanadan katta bo'lishi kerak!" + "\n"
+                + "Bugungi sana:" +"'"+ LocalDate.now()+"'" + "\n"
+                + "So'rovnoma yaratishni bekor qilish uchun: /exit";
             return sendText(chatId, text1);
           }
           draft.setStartDate(LocalDate.parse(text));
           stateHolder.put(chatId, PollCreateState.WAITING_FINISHED_DATE);
           String startDate = draft.getStartDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
           return sendText(chatId,
-              "📅 Tugash sanasini kiriting (yyyy-MM-dd):\n\nMasalan: `" + startDate + "`" + "\n"
-                  + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+              "📅 Tugash sanasini kiriting (yyyy-MM-dd):\n\nMasalan:" +"'"+ startDate +"'" + "\n"
+                  + "So'rovnoma yaratishni bekor qilish uchun: /exit");
         } catch (Exception e) {
           return sendText(chatId, "❌ Noto'g'ri format! Qaytadan kiriting (yyyy-MM-dd):" + "\n"
-              + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+              + "So'rovnoma yaratishni bekor qilish uchun: /exit");
         }
       }
       case WAITING_FINISHED_DATE -> {
@@ -553,18 +559,18 @@ public class BotResponseServiceImpl implements BotResponseService {
         try {
           if (LocalDate.parse(text).isBefore(draft.getStartDate())) {
             String text1 =
-                "Xatolik kiritilgan sana boshlanish sanasidan keyin bo'lishi kerak‼️‼️" + "\n"
+                "Xatolik kiritilgan sana boshlanish sanasidan katta bo'lishi kerak!" + "\n"
                     + "Boshlanish sanasi:" + draft.getStartDate() + "\n"
-                    + "So'rovnoma yaratishni bekor qlish uchun: /exit";
+                    + "So'rovnoma yaratishni bekor qilish uchun: /exit";
             return sendText(chatId, text1);
           }
           draft.setFinishedDate(LocalDate.parse(text));
           stateHolder.put(chatId, PollCreateState.WAITING_CHANNELS);
           return sendText(chatId, "Kanal linkini kiriting kiriting.\nTugagach /done yozing:" + "\n"
-              + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+              + "So'rovnoma yaratishni bekor qilish uchun: /exit");
         } catch (Exception e) {
           return sendText(chatId, "❌ Noto'g'ri format! Qaytadan kiriting (yyyy-MM-dd):" + "\n"
-              + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+              + "So'rovnoma yaratishni bekor qilish uchun: /exit");
         }
       }
       case WAITING_CHANNELS -> {
@@ -572,57 +578,57 @@ public class BotResponseServiceImpl implements BotResponseService {
           return pressExit(update);
         }
         if (!update.getMessage().hasText()) {
-          return sendText(chatId, "Xatolik iltimos text formatda ma'lumot kiriting‼️‼️" + "\n"
-              + "➕ Kanallar linkini kiriting.\nTugagach yoki o'tkazib yuborish uchun: /done" + "\n"
-              + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+          return sendText(chatId, "Xatolik iltimos text formatda ma'lumot kiriting!" + "\n"
+              + "➕ Kanal linkini kiriting.\nTugagach yoki o'tkazib yuborish uchun: /done" + "\n"
+              + "So'rovnoma yaratishni bekor qilish uchun: /exit");
         }
         if (text.equals("/done")) {
           if (channelDrafts.get(chatId).isEmpty()) {
             log.info("Kanal linklari ulanmadi:{}", chatId);
             channelDrafts.put(chatId, new ArrayList<>());
             stateHolder.put(chatId, PollCreateState.WAITING_CANDIDATES);
-            return sendText(chatId, "✅Obuna uchun kanal ulanmadi" + "\n"+
-                "👤 Kandidat ismini kiritishingiz mumkin!"+"\n"
-                + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+            return sendText(chatId, "✅Obuna uchun kanal ulanmadi" + "\n" +
+                "👤 Nomzod ismini kiritishingiz mumkin!" + "\n"
+                + "So'rovnoma yaratishni bekor qilish uchun: /exit");
           }
           log.info("So'rovnoma uchun kanallar qo'shilmoqda: chatId={}", chatId);
           stateHolder.put(chatId, PollCreateState.WAITING_CANDIDATES);
-          return sendText(chatId, "👤 Kandidat ismini kiriting.\nTugagach /done yozing:" + "\n"
-              + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+          return sendText(chatId, "👤 Nomzod ismini kiriting.\nTugagach /done yozing:" + "\n"
+              + "So'rovnoma yaratishni bekor qilish uchun: /exit");
         }
         if (!text.startsWith("@")) {
           return sendText(chatId,
-              "❌Kiritilayotgan format xato iltimos kanal linki '@' bilan boshlanishi kerak‼️‼️"
+              "❌Kiritilayotgan format xato iltimos kanal linki '@' bilan boshlanishi kerak!"
                   + "\n"
-                  + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+                  + "So'rovnoma yaratishni bekor qilish uchun: /exit");
         }
         if (!isChannelExists(text)) {
-          return sendText(chatId, "Bunday linkdagi kanal topilmadi iltimos‼️‼️" + "\n"
-              + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+          return sendText(chatId, "Bunday linkdagi kanal topilmadi iltimos!" + "\n"
+              + "So'rovnoma yaratishni bekor qilish uchun: /exit");
         }
         if (!isBotAdminInChannel(text)) {
           return sendText(chatId,
               "❌Iltimos tekshiring bot tashlangan kanalda admin bo'lishi kerak" + "\n"
-                  + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+                  + "So'rovnoma yaratishni bekor qilish uchun: /exit");
         }
         channelDrafts.get(chatId).add(text);
         log.info("Kanal qo'shildi: chatId={}, candidateName={}", chatId, text);
         return sendText(chatId, "✅ Qo'shildi! Yana kanal link yoki /done:" + "\n"
-            + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+            + "So'rovnoma yaratishni bekor qilish uchun: /exit");
       }
       case WAITING_CANDIDATES -> {
         if (update.getMessage().getText().equals("/exit")) {
           return pressExit(update);
         }
         if (!update.getMessage().hasText()) {
-          return sendText(chatId, "Xatolik iltimos text formatda ma'lumot kiriting‼️‼️" + "\n"
-              + "👤 Kandidat ismini kiriting.\nTugagach /done yozing:" + "\n"
-              + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+          return sendText(chatId, "Xatolik iltimos text formatda ma'lumot kiriting!" + "\n"
+              + "👤 Nomzod ismini kiriting.\nTugagach /done yozing:" + "\n"
+              + "So'rovnoma yaratishni bekor qilish uchun: /exit");
         }
         if (text.equals("/done")) {
           if (candidateDrafts.get(chatId).size() < 2) {
-            return sendText(chatId, "So'rovnomada kamida 2 kishi qatnashishi kerak‼️‼️" + "\n"
-                + "So'rovnoma yaratishni bekor qlish uchun: /exit");
+            return sendText(chatId, "So'rovnomada kamida 2 kishi qatnashishi kerak!" + "\n"
+                + "So'rovnoma yaratishni bekor qilish uchun: /exit");
           }
           log.info("So'rovnoma yaratish yakunlanmoqda: chatId={}", chatId);
           return finishPollCreation(chatId);
@@ -633,8 +639,8 @@ public class BotResponseServiceImpl implements BotResponseService {
         candidate.setVoteCount(0);
         Candidate saved = candidateRepository.save(candidate);
         candidateDrafts.get(chatId).add(saved.getId().toString());
-        log.info("Kandidat qo'shildi: chatId={}, candidateName={}", chatId, text);
-        return sendText(chatId, "✅ Qo'shildi! Yana kandidat yoki /done:");
+        log.info("Nomzod qo'shildi: chatId={}, candidateName={}", chatId, text);
+        return sendText(chatId, "✅ Qo'shildi! Yana nomzod yoki /done:");
       }
     }
     return sendText(chatId, "Noma'lum holat");
@@ -645,13 +651,13 @@ public class BotResponseServiceImpl implements BotResponseService {
     Long chatId = update.getMessage().getChatId();
     if (userRepository.findByChatId(chatId).get().getRole().equals(UserRole.USER)) {
       log.warn("Ruxsatsiz arxiv ko'rish urinishi: chatId={}", chatId);
-      return sendText(chatId, "Bu so'rov uchun ruxsat yoq‼️⛔");
+      return sendText(chatId, "Bu so'rov uchun ruxsat yo'q⛔");
     }
     return pressPassivePolls(update, "poll_");
   }
 
   public BotApiMethod<?> pressPassivePolls(Update update, String callbackData) {
-    List<Poll> pollList = pollRepository.findByActive(false);
+    List<Poll> pollList = pollRepository.findByActiveAndChannelMessageIdIsNotNull(false);
     Long chatId = update.getMessage().getChatId();
 
     List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -669,7 +675,7 @@ public class BotResponseServiceImpl implements BotResponseService {
     markup.setKeyboard(rows);
     SendMessage sendMessage = new SendMessage();
     if (pollList.isEmpty()) {
-      sendMessage.setText("Yakunlangan so'rovnomalar hali mavjud emas‼️‼️");
+      sendMessage.setText("Yakunlangan so'rovnomalar hali mavjud emas!");
     } else {
       sendMessage.setText("Yakunlangan so'rovnomalar🔚⛔");
     }
@@ -766,7 +772,7 @@ public class BotResponseServiceImpl implements BotResponseService {
     Long chatId = update.getMessage().getChatId();
     log.info("pressGetResult: chatId={}", chatId);
 
-    List<Poll> pollList = pollRepository.findByActive(true);
+    List<Poll> pollList = pollRepository.findByActiveAndChannelMessageIdIsNotNull(true);
 
     List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
@@ -794,7 +800,7 @@ public class BotResponseServiceImpl implements BotResponseService {
     Long chatId = update.getMessage().getChatId();
     if (userRepository.findByChatId(chatId).get().getRole().equals(UserRole.USER)) {
       log.warn("Ruxsatsiz so'rovnomani to'xtatish urinishi: chatId={}", chatId);
-      return sendText(chatId, "Bu so'rov uchun ruxsat yoq‼️⛔");
+      return sendText(chatId, "Bu so'rov uchun ruxsat yo'q⛔");
     }
     return pressActivePolls(update, "finish_poll");
   }
@@ -804,7 +810,7 @@ public class BotResponseServiceImpl implements BotResponseService {
     Long chatId = update.getMessage().getChatId();
     if (userRepository.findByChatId(chatId).get().getRole().equals(UserRole.USER)) {
       log.warn("Ruxsatsiz eksport urinishi: chatId={}", chatId);
-      return sendText(chatId, "Bu so'rov uchun ruxsat yoq‼️⛔");
+      return sendText(chatId, "Bu so'rov uchun ruxsat yo'q⛔");
     }
     return pressPassivePolls(update, "get_result");
   }
@@ -814,7 +820,7 @@ public class BotResponseServiceImpl implements BotResponseService {
     Long chatId = update.getMessage().getChatId();
     if (userRepository.findByChatId(chatId).get().getRole().equals(UserRole.USER)) {
       log.warn("Ruxsatsiz ovoz tozalash urinishi: chatId={}", chatId);
-      return sendText(chatId, "Bu so'rov uchun ruxsat yoq‼️⛔");
+      return sendText(chatId, "Bu so'rov uchun ruxsat yo'q⛔");
     }
     return pressActivePolls(update, "clear_votes");
   }
@@ -842,7 +848,7 @@ public class BotResponseServiceImpl implements BotResponseService {
     EditMessageText editMessage = new EditMessageText();
     editMessage.setChatId(chatId.toString());
     editMessage.setMessageId(messageId);
-    editMessage.setText("Bu so'rovnomaning ovozlar soni tozalandi‼️‼️");
+    editMessage.setText("Bu so'rovnomaning ovozlar soni tozalandi.");
 
     sendPollToChannelEditMessage(poll);
 
@@ -857,12 +863,12 @@ public class BotResponseServiceImpl implements BotResponseService {
     Optional<User> user = userRepository.findByChatId(chatId);
     if (!user.get().getRole().equals(UserRole.SUPER_ADMIN)) {
       log.warn("Ruxsatsiz admin qo'shish urinishi: chatId={}", chatId);
-      return sendText(chatId, "Bu so'rov uchun ruxsat yoq‼️⛔");
+      return sendText(chatId, "Bu so'rov uchun ruxsat yo'q⛔");
     }
     addAdminStatus.put(chatId, true);
     return sendText(chatId, "Yangi adminning usernameni to'g'ri formatda kiriting: " + "\n"
         + "Misol uchun: @username" + "\n"
-        + "Eslatma‼️‼️:admin botdan registratsiyadan o'tgan bo'lishi kerak.");
+        + "Eslatma! :admin botdan registratsiyadan o'tgan bo'lishi kerak!");
   }
 
   @Override
@@ -872,11 +878,11 @@ public class BotResponseServiceImpl implements BotResponseService {
     if (!user.get().getRole().equals(UserRole.SUPER_ADMIN)) {
       addAdminStatus.put(chatId, false);
       log.warn("Ruxsatsiz newAdmin urinishi: chatId={}", chatId);
-      return sendText(chatId, "Bu so'rov uchun ruxsat yoq‼️⛔");
+      return sendText(chatId, "Bu so'rov uchun ruxsat yo'q⛔");
     }
 
     if (!addAdminStatus.getOrDefault(chatId, false)) {
-      return sendText(chatId, "Noma'lum so'rov‼️‼️‼️");
+      return sendText(chatId, "Noma'lum so'rov!");
     }
 
     String username = update.getMessage().getText().substring(1).toLowerCase();
@@ -886,19 +892,19 @@ public class BotResponseServiceImpl implements BotResponseService {
     if (users.isEmpty()) {
       addAdminStatus.put(chatId, false);
       log.warn("Admin qo'shish: user topilmadi, username={}", username);
-      return sendText(chatId, "Bunday user topilmadi‼️‼️‼️‼️");
+      return sendText(chatId, "Bunday user topilmadi!");
     }
     if (users.get().getRole().equals(UserRole.ADMIN)) {
       addAdminStatus.put(chatId, false);
       log.info("Admin qo'shish: allaqachon admin, username={}", username);
-      return sendText(chatId, "Bu user allaqachon adminlikka tayinlangan‼️");
+      return sendText(chatId, "Bu user allaqachon adminlikka tayinlangan!");
     }
     users.get().setRole(UserRole.ADMIN);
     userRepository.save(users.get());
     addAdminStatus.put(chatId, false);
 
     log.info("Yangi admin tayinlandi: username={}", username);
-    return sendText(chatId, "Yangi admin tayinlandi✅✅✅");
+    return sendText(chatId, "Yangi admin tayinlandi✅");
   }
 
   @Override
@@ -909,12 +915,23 @@ public class BotResponseServiceImpl implements BotResponseService {
     Optional<User> user = userRepository.findByChatId(chatId);
     if (!user.get().getRole().equals(UserRole.SUPER_ADMIN)) {
       log.warn("Ruxsatsiz admin o'chirish urinishi: chatId={}", chatId);
-      return sendText(chatId, "Bu so'rov uchun ruxsat yoq‼️⛔");
+      return sendText(chatId, "Bu so'rov uchun ruxsat yo'q⛔");
     }
     removeAdminStatus.put(chatId, true);
-    return sendText(chatId, "Adminning usernameni to'g'ri formatda kiriting: " + "\n"
-        + "Misol uchun: remove@username" + "\n"
-        + "Eslatma‼️‼️:username oldidan 'remove' so'zi qo'lishi kerak.");
+    List<User> admins = userRepository.getByRole(UserRole.ADMIN);
+    if (admins.isEmpty()) {
+      removeAdminStatus.put(chatId, false);
+      return sendText(chatId,"Adminlar topilmadi!");
+    }
+    StringBuilder text = new StringBuilder();
+    text.append("Adminlar:\n");
+    for (User admin : admins) {
+      text.append("@").append(admin.getUsername()).append("\n");
+    }
+    text.append("\nAdminning usernameni to'g'ri formatda kiriting: \n")
+        .append("Misol uchun: remove@username\n")
+        .append("Eslatma: username oldidan 'remove' so'zi qo'shilishi kerak.");
+    return sendText(chatId, String.valueOf(text));
   }
 
   @Override
@@ -924,11 +941,11 @@ public class BotResponseServiceImpl implements BotResponseService {
     if (!user.get().getRole().equals(UserRole.SUPER_ADMIN)) {
       removeAdminStatus.put(chatId, false);
       log.warn("Ruxsatsiz removedAdmin urinishi: chatId={}", chatId);
-      return sendText(chatId, "Bu so'rov uchun ruxsat yoq‼️⛔");
+      return sendText(chatId, "Bu so'rov uchun ruxsat yo'q⛔");
     }
 
     if (!removeAdminStatus.getOrDefault(chatId, false)) {
-      return sendText(chatId, "Noma'lum so'rov‼️‼️‼️");
+      return sendText(chatId, "Noma'lum so'rov");
     }
 
     String username = update.getMessage().getText().toLowerCase().substring(7);
@@ -937,14 +954,14 @@ public class BotResponseServiceImpl implements BotResponseService {
     Optional<User> users = userRepository.getByUsernameAndRole(username, UserRole.ADMIN);
     if (users.isEmpty()) {
       log.warn("Admin o'chirish: admin topilmadi, username={}", username);
-      return sendText(chatId, "Bunday admin topilmadi‼️‼️‼️‼️");
+      return sendText(chatId, "Bunday admin topilmadi");
     }
     users.get().setRole(UserRole.USER);
     userRepository.save(users.get());
     removeAdminStatus.put(chatId, false);
 
     log.info("Admin o'chirildi: username={}", username);
-    return sendText(chatId, "Admin o'chirildi✅✅✅");
+    return sendText(chatId, "Admin o'chirildi✅");
   }
 
   @Override
@@ -973,7 +990,7 @@ public class BotResponseServiceImpl implements BotResponseService {
     deleteMessage.setMessageId(messageId);
     messageSender.deleteMessage(deleteMessage);
 
-    return sendText(chatId, "So'rovnoma kanalga yuborildi✅✅✅");
+    return sendText(chatId, "So'rovnoma kanalga yuborildi✅");
   }
 
   @Override
@@ -1035,6 +1052,29 @@ public class BotResponseServiceImpl implements BotResponseService {
     return editMessage;
   }
 
+  @Override
+  public BotApiMethod<?> pressNotApprovedPoll(Update update) {
+    Long chatId = update.getCallbackQuery().getMessage().getChatId();
+    return sendText(chatId,"❌ Iltimos ovoz berishdan oldin kanalga yuborib tasqidlang!");
+  }
+
+  @Override
+  public BotApiMethod<?> sendToAdminsStart(Long chatId,String s) {
+   return sendText(chatId, s);
+  }
+
+  @Override
+  public BotApiMethod<?> sendToAdminsStop(Long chatId,String s) {
+    return sendText(chatId, s);
+  }
+
+
+  @Override
+  public List<Long> getAdminsChatId() {
+    return userRepository.getChatIdsByRoles(UserRole.ADMIN,
+        UserRole.SUPER_ADMIN);
+  }
+
   private SendMessage finishPollCreation(Long chatId) {
     Poll poll = pollDrafts.get(chatId);
     List<String> candidateIds = candidateDrafts.get(chatId);
@@ -1056,7 +1096,7 @@ public class BotResponseServiceImpl implements BotResponseService {
     log.info("So'rovnoma muvaffaqiyatli yaratildi: pollId={}, title={}", poll.getId(),
         poll.getTitle());
 
-    return sendText(chatId, "✅ So'rovnoma yaratildi kanalga yuborsh uchun tasdiqlang!!!!");
+    return sendText(chatId, "✅ So'rovnoma yaratildi kanalga yuborish uchun tasdiqlang!");
   }
 
   private void sendPollToChannel(Poll poll) {
@@ -1110,7 +1150,7 @@ public class BotResponseServiceImpl implements BotResponseService {
       Candidate candidate = candidateRepository.findById(candidateId).orElseThrow();
 
       InlineKeyboardButton button = new InlineKeyboardButton();
-      button.setText(candidate.getName() + "  " + candidate.getVoteCount());
+      button.setText(candidate.getName() + " - " + candidate.getVoteCount());
       button.setUrl("https://t.me/" + botUsername + "?start=" + poll.getId());
       rows.add(List.of(button));
     }
@@ -1134,6 +1174,7 @@ public class BotResponseServiceImpl implements BotResponseService {
     SendMessage message = new SendMessage();
     message.setChatId(chatId.toString());
     message.setText(text);
+
     return message;
   }
 
@@ -1159,7 +1200,7 @@ public class BotResponseServiceImpl implements BotResponseService {
   }
 
   public BotApiMethod<?> pressActivePolls(Update update, String callbackData) {
-    List<Poll> pollList = pollRepository.findByActive(true);
+    List<Poll> pollList = pollRepository.findByActiveAndChannelMessageIdIsNotNull(true);
     Long chatId = update.getMessage().getChatId();
 
     List<List<InlineKeyboardButton>> rows = new ArrayList<>();
