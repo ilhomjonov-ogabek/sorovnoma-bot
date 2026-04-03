@@ -1248,7 +1248,7 @@ public class BotResponseServiceImpl implements BotResponseService {
     return pressAdminPage(update);
   }
 
-  private boolean isBotAdminInChannel(String channelUsername) {
+  /*private boolean isBotAdminInChannel(String channelUsername) {
     try {
       GetChatMember getChatMember = new GetChatMember();
       getChatMember.setChatId(channelUsername);
@@ -1257,6 +1257,30 @@ public class BotResponseServiceImpl implements BotResponseService {
       ChatMember member = messageSender.execute(getChatMember);
       String status = member.getStatus();
 
+      return status.equals("administrator") || status.equals("creator");
+
+    } catch (Exception e) {
+      log.error("Bot admin tekshirishda xatolik: channel={}", channelUsername, e);
+      return false;
+    }
+  }*/
+
+  private boolean isBotAdminInChannel(String channelUsername) {
+    if (channelUsername == null || channelUsername.isBlank()
+        || channelUsername.equals("@telegram")) {
+      return false;
+    }
+
+    try {
+      GetChatMember getChatMember = new GetChatMember();
+      getChatMember.setChatId(channelUsername);
+      getChatMember.setUserId(messageSender.getBotId());
+
+      ChatMember member = messageSender.execute(getChatMember);
+
+      if (member == null) return false;
+
+      String status = member.getStatus();
       return status.equals("administrator") || status.equals("creator");
 
     } catch (Exception e) {
