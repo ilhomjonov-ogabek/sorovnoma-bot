@@ -514,13 +514,14 @@ public class BotResponseServiceImpl implements BotResponseService {
             + "So'rovnoma yaratishni bekor qilish uchun: /exit");
       }
       case WAITING_TITLE -> {
-        if (update.getMessage().getText().equals("/exit")) {
-          return pressExit(update);
-        }
         if (!update.getMessage().hasText()) {
           return sendText(chatId, "Xatolik iltimos text formatda ma'lumot kiriting!" + "\n"
               + "📝 So'rovnoma sarlavhasini kiriting:" + "\n"
               + "So'rovnoma yaratishni bekor qilish uchun: /exit");
+        }
+
+        if (update.getMessage().getText().equals("/exit")) {
+          return pressExit(update);
         }
         draft.setTitle(text);
         stateHolder.put(chatId, PollCreateState.WAITING_START_DATE);
@@ -531,6 +532,12 @@ public class BotResponseServiceImpl implements BotResponseService {
                 + "So'rovnoma yaratishni bekor qilish uchun: /exit");
       }
       case WAITING_START_DATE -> {
+        if (!update.getMessage().hasText()) {
+          String text1 = "Xatolik iltimos sanani to'g'ri kiriting!" + "\n"
+              + "Bugungi sana:" +"'"+ LocalDate.now()+"'" + "\n"
+              + "So'rovnoma yaratishni bekor qilish uchun: /exit";
+          return sendText(chatId, text1);
+        }
         if (update.getMessage().getText().equals("/exit")) {
           return pressExit(update);
         }
@@ -553,6 +560,12 @@ public class BotResponseServiceImpl implements BotResponseService {
         }
       }
       case WAITING_FINISHED_DATE -> {
+        if (!update.getMessage().hasText()) {
+          String text1 = "Xatolik iltimos sanani to'g'ri kiriting!" + "\n"
+              + "Bugungi sana:" +"'"+ LocalDate.now()+"'" + "\n"
+              + "So'rovnoma yaratishni bekor qilish uchun: /exit";
+          return sendText(chatId, text1);
+        }
         if (update.getMessage().getText().equals("/exit")) {
           return pressExit(update);
         }
@@ -574,13 +587,13 @@ public class BotResponseServiceImpl implements BotResponseService {
         }
       }
       case WAITING_CHANNELS -> {
-        if (update.getMessage().getText().equals("/exit")) {
-          return pressExit(update);
-        }
         if (!update.getMessage().hasText()) {
           return sendText(chatId, "Xatolik iltimos text formatda ma'lumot kiriting!" + "\n"
               + "➕ Kanal linkini kiriting.\nTugagach yoki o'tkazib yuborish uchun: /done" + "\n"
               + "So'rovnoma yaratishni bekor qilish uchun: /exit");
+        }
+        if (update.getMessage().getText().equals("/exit")) {
+          return pressExit(update);
         }
         if (text.equals("/done")) {
           if (channelDrafts.get(chatId).isEmpty()) {
@@ -617,13 +630,13 @@ public class BotResponseServiceImpl implements BotResponseService {
             + "So'rovnoma yaratishni bekor qilish uchun: /exit");
       }
       case WAITING_CANDIDATES -> {
-        if (update.getMessage().getText().equals("/exit")) {
-          return pressExit(update);
-        }
         if (!update.getMessage().hasText()) {
           return sendText(chatId, "Xatolik iltimos text formatda ma'lumot kiriting!" + "\n"
               + "👤 Nomzod ismini kiriting.\nTugagach /done yozing:" + "\n"
               + "So'rovnoma yaratishni bekor qilish uchun: /exit");
+        }
+        if (update.getMessage().getText().equals("/exit")) {
+          return pressExit(update);
         }
         if (text.equals("/done")) {
           if (candidateDrafts.get(chatId).size() < 2) {
