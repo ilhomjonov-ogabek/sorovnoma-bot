@@ -1349,7 +1349,7 @@ public class BotResponseServiceImpl implements BotResponseService {
 
   private boolean isRateLimited(Long chatId) {
     LocalDateTime lastTime = voteRateLimit.get(chatId);
-    if (lastTime != null && lastTime.plusSeconds(3).isAfter(LocalDateTime.now())) {
+    if (lastTime != null && lastTime.plusSeconds(2).isAfter(LocalDateTime.now())) {
       return true;
     }
     voteRateLimit.put(chatId, LocalDateTime.now());
