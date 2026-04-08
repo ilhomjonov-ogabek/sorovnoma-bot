@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sorovnoma_bot
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: Ogabek2006
+      BOT_USERNAME: "@sorovnoma_2026_bot"
+      BOT_USERNAME_NEW: sorovnoma_2026_bot
+      BOT_TOKEN: 8577421885:AAFqBfmsY5jBv2-D0f8Cf37LH86TjmPnlMI
+      TELEGRAM_CHANNEL_ID: "@sorovnoma_2026"
+
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_DB: sorovnoma_bot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Ogabek2006
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

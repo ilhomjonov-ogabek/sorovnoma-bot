@@ -1,5 +1,8 @@
 package spring.boot.sorovnomabot.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -34,6 +37,7 @@ import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageCa
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.MessageEntity;
 import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.chatmember.ChatMember;
@@ -61,6 +65,7 @@ public class BotResponseServiceImpl implements BotResponseService {
   private final CandidateRepository candidateRepository;
   private final MessageSender messageSender;
   private final PollCreationStateHolder stateHolder;
+  private final ObjectMapper objectMapper;
 
   private final Map<Long, Poll> pollDrafts = new ConcurrentHashMap<>();
   private final Map<Long, List<String>> candidateDrafts = new ConcurrentHashMap<>();
@@ -69,6 +74,7 @@ public class BotResponseServiceImpl implements BotResponseService {
   private final Map<Long, Boolean> addAdminStatus = new ConcurrentHashMap<>();
   private final Map<Long, Boolean> removeAdminStatus = new ConcurrentHashMap<>();
   private final Map<Long, Boolean> createPollStatus = new ConcurrentHashMap<>();
+  private final Map<Long, String> titleEntities = new ConcurrentHashMap<>();
 
 
   @Value("${telegram.channel.id}")
@@ -78,13 +84,14 @@ public class BotResponseServiceImpl implements BotResponseService {
   private String botUsername;
 
   public BotResponseServiceImpl(UserRepository userRepository, PollRepository pollRepository,
-      CandidateRepository candidateRepository,@Lazy MessageSender messageSender,
-      PollCreationStateHolder stateHolder) {
+      CandidateRepository candidateRepository, @Lazy MessageSender messageSender,
+      PollCreationStateHolder stateHolder, ObjectMapper objectMapper) {
     this.userRepository = userRepository;
     this.pollRepository = pollRepository;
     this.candidateRepository = candidateRepository;
     this.messageSender = messageSender;
     this.stateHolder = stateHolder;
+    this.objectMapper = objectMapper;
   }
 
   @Override
@@ -119,7 +126,7 @@ public class BotResponseServiceImpl implements BotResponseService {
       messageSender.send(sendText(chatId, "❌Bu so'rovnoma allaqachon yakunlangan!!!!!"));
     } else {
 
-      messageSender.sendPoll(sendPoll(chatId,poll));
+      messageSender.sendPoll(sendPoll(chatId, poll));
     }
   }
 
@@ -171,7 +178,7 @@ public class BotResponseServiceImpl implements BotResponseService {
       return sendMessage;
     }
 
-    if (poll.get().getFinishedDate().isBefore(LocalDate.now())||!poll.get().isActive()) {
+    if (poll.get().getFinishedDate().isBefore(LocalDate.now()) || !poll.get().isActive()) {
       log.info("Yakunlangan so'rovnomaga ovoz berishga urinish: pollId={}, chatId={}", pollId,
           chatId);
       sendMessage.setText("❌Bu so'rovnoma allaqachon yakunlangan!!" + "\n" +
@@ -428,11 +435,22 @@ public class BotResponseServiceImpl implements BotResponseService {
     markup.setKeyboard(rows);
 
     String caption = p.getTitle();
+    List<MessageEntity> entities = List.of();
+    try {
+      entities = objectMapper.readValue(
+          poll.get().getTitleEntities(),
+          new TypeReference<>() {
+          }
+      );
+    } catch (JsonProcessingException e) {
+      log.error(e.getMessage());
+    }
 
     EditMessageCaption message = new EditMessageCaption();
     message.setChatId(chatId.toString());
     message.setMessageId(messageId);
     message.setCaption(caption);
+    message.setCaptionEntities(entities);
     message.setReplyMarkup(markup);
 
     sendPollToChannelEditMessage(poll.get());
@@ -465,11 +483,22 @@ public class BotResponseServiceImpl implements BotResponseService {
     markup.setKeyboard(rows);
 
     String caption = p.getTitle();
+    List<MessageEntity> entities = List.of();
+    try {
+      entities = objectMapper.readValue(
+          poll.get().getTitleEntities(),
+          new TypeReference<>() {
+          }
+      );
+    } catch (JsonProcessingException e) {
+      log.error(e.getMessage());
+    }
 
     SendPhoto sendPhoto = new SendPhoto();
     sendPhoto.setChatId(chatId.toString());
     sendPhoto.setPhoto(new InputFile(p.getPictureId()));
     sendPhoto.setCaption(caption);
+    sendPhoto.setCaptionEntities(entities);
     sendPhoto.setReplyMarkup(markup);
 
     return sendPhoto;
@@ -523,18 +552,24 @@ public class BotResponseServiceImpl implements BotResponseService {
         if (update.getMessage().getText().equals("/exit")) {
           return pressExit(update);
         }
+        try {
+          titleEntities.put(chatId,
+              objectMapper.writeValueAsString(update.getMessage().getEntities()));
+        } catch (JsonProcessingException e) {
+          log.error("Error put title entity:" + e.getMessage());
+        }
         draft.setTitle(text);
         stateHolder.put(chatId, PollCreateState.WAITING_START_DATE);
         String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
         return sendText(chatId,
             "📅 Boshlanish sanasini kiriting (yyyy-MM-dd):\n\nMasalan: " + "'" + today + "'"
-                 + "\n"
+                + "\n"
                 + "So'rovnoma yaratishni bekor qilish uchun: /exit");
       }
       case WAITING_START_DATE -> {
         if (!update.getMessage().hasText()) {
           String text1 = "Xatolik iltimos sanani to'g'ri kiriting!" + "\n"
-              + "Bugungi sana:" +"'"+ LocalDate.now()+"'" + "\n"
+              + "Bugungi sana:" + "'" + LocalDate.now() + "'" + "\n"
               + "So'rovnoma yaratishni bekor qilish uchun: /exit";
           return sendText(chatId, text1);
         }
@@ -544,7 +579,7 @@ public class BotResponseServiceImpl implements BotResponseService {
         try {
           if (LocalDate.parse(text).isBefore(LocalDate.now())) {
             String text1 = "Xatolik kiritilgan sana bugungi sanadan katta bo'lishi kerak!" + "\n"
-                + "Bugungi sana:" +"'"+ LocalDate.now()+"'" + "\n"
+                + "Bugungi sana:" + "'" + LocalDate.now() + "'" + "\n"
                 + "So'rovnoma yaratishni bekor qilish uchun: /exit";
             return sendText(chatId, text1);
           }
@@ -552,7 +587,7 @@ public class BotResponseServiceImpl implements BotResponseService {
           stateHolder.put(chatId, PollCreateState.WAITING_FINISHED_DATE);
           String startDate = draft.getStartDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
           return sendText(chatId,
-              "📅 Tugash sanasini kiriting (yyyy-MM-dd):\n\nMasalan:" +"'"+ startDate +"'" + "\n"
+              "📅 Tugash sanasini kiriting (yyyy-MM-dd):\n\nMasalan:" + "'" + startDate + "'" + "\n"
                   + "So'rovnoma yaratishni bekor qilish uchun: /exit");
         } catch (Exception e) {
           return sendText(chatId, "❌ Noto'g'ri format! Qaytadan kiriting (yyyy-MM-dd):" + "\n"
@@ -562,7 +597,7 @@ public class BotResponseServiceImpl implements BotResponseService {
       case WAITING_FINISHED_DATE -> {
         if (!update.getMessage().hasText()) {
           String text1 = "Xatolik iltimos sanani to'g'ri kiriting!" + "\n"
-              + "Bugungi sana:" +"'"+ LocalDate.now()+"'" + "\n"
+              + "Bugungi sana:" + "'" + LocalDate.now() + "'" + "\n"
               + "So'rovnoma yaratishni bekor qilish uchun: /exit";
           return sendText(chatId, text1);
         }
@@ -934,7 +969,7 @@ public class BotResponseServiceImpl implements BotResponseService {
     List<User> admins = userRepository.getByRole(UserRole.ADMIN);
     if (admins.isEmpty()) {
       removeAdminStatus.put(chatId, false);
-      return sendText(chatId,"Adminlar topilmadi!");
+      return sendText(chatId, "Adminlar topilmadi!");
     }
     StringBuilder text = new StringBuilder();
     text.append("Adminlar:\n");
@@ -1068,16 +1103,16 @@ public class BotResponseServiceImpl implements BotResponseService {
   @Override
   public BotApiMethod<?> pressNotApprovedPoll(Update update) {
     Long chatId = update.getCallbackQuery().getMessage().getChatId();
-    return sendText(chatId,"❌ Iltimos ovoz berishdan oldin kanalga yuborib tasqidlang!");
+    return sendText(chatId, "❌ Iltimos ovoz berishdan oldin kanalga yuborib tasqidlang!");
   }
 
   @Override
-  public BotApiMethod<?> sendToAdminsStart(Long chatId,String s) {
-   return sendText(chatId, s);
+  public BotApiMethod<?> sendToAdminsStart(Long chatId, String s) {
+    return sendText(chatId, s);
   }
 
   @Override
-  public BotApiMethod<?> sendToAdminsStop(Long chatId,String s) {
+  public BotApiMethod<?> sendToAdminsStop(Long chatId, String s) {
     return sendText(chatId, s);
   }
 
@@ -1096,12 +1131,14 @@ public class BotResponseServiceImpl implements BotResponseService {
     poll.setCandidatesId(candidateIds.stream().map(Long::parseLong).toList());
     poll.setChannellsId(new ArrayList<>(channelDrafts.get(chatId)));
     poll.setUsersId(new ArrayList<>());
+    poll.setTitleEntities(titleEntities.get(chatId));
     pollRepository.save(poll);
 
     stateHolder.remove(chatId);
     pollDrafts.remove(chatId);
     candidateDrafts.remove(chatId);
     channelDrafts.remove(chatId);
+    titleEntities.remove(chatId);
 
     messageSender.sendPollToAprove(poll, chatId);
     createPollStatus.put(chatId, false);
@@ -1139,12 +1176,23 @@ public class BotResponseServiceImpl implements BotResponseService {
     markup.setKeyboard(rows);
 
     String text = poll.getTitle();
+    List<MessageEntity> entities = List.of();
+    try {
+      entities = objectMapper.readValue(
+          poll.getTitleEntities(),
+          new TypeReference<>() {
+          }
+      );
+    } catch (JsonProcessingException e) {
+      log.error(e.getMessage());
+    }
 
     SendPhoto sendMessage = new SendPhoto();
     sendMessage.setCaption(text);
     sendMessage.setPhoto(new InputFile(poll.getPictureId()));
     sendMessage.setReplyMarkup(markup);
     sendMessage.setChatId(channelId);
+    sendMessage.setCaptionEntities(entities);
     Message sentMessage = messageSender.sendPollToChannel(sendMessage);
     poll.setChannelMessageId(sentMessage.getMessageId());
     log.info("Kanal xabari saqlandi: pollId={}, channelMessageId={}", poll.getId(),
@@ -1172,12 +1220,23 @@ public class BotResponseServiceImpl implements BotResponseService {
     markup.setKeyboard(rows);
 
     String caption = poll.getTitle();
+    List<MessageEntity> entities = List.of();
+    try {
+      entities = objectMapper.readValue(
+          poll.getTitleEntities(),
+          new TypeReference<>() {
+          }
+      );
+    } catch (JsonProcessingException e) {
+      log.error(e.getMessage());
+    }
 
     EditMessageCaption editMessage = new EditMessageCaption();
     editMessage.setMessageId(poll.getChannelMessageId());
     editMessage.setCaption(caption);
     editMessage.setReplyMarkup(markup);
     editMessage.setChatId(channelId);
+    editMessage.setCaptionEntities(entities);
     messageSender.send(editMessage);
 
     log.info("Kanallar xabari muvaffaqiyatli yangilandi: pollId={}", poll.getId());
@@ -1248,23 +1307,6 @@ public class BotResponseServiceImpl implements BotResponseService {
     return pressAdminPage(update);
   }
 
-  /*private boolean isBotAdminInChannel(String channelUsername) {
-    try {
-      GetChatMember getChatMember = new GetChatMember();
-      getChatMember.setChatId(channelUsername);
-      getChatMember.setUserId(messageSender.getBotId());
-
-      ChatMember member = messageSender.execute(getChatMember);
-      String status = member.getStatus();
-
-      return status.equals("administrator") || status.equals("creator");
-
-    } catch (Exception e) {
-      log.error("Bot admin tekshirishda xatolik: channel={}", channelUsername, e);
-      return false;
-    }
-  }*/
-
   private boolean isBotAdminInChannel(String channelUsername) {
     if (channelUsername == null || channelUsername.isBlank()
         || channelUsername.equals("@telegram")) {
@@ -1278,7 +1320,9 @@ public class BotResponseServiceImpl implements BotResponseService {
 
       ChatMember member = messageSender.execute(getChatMember);
 
-      if (member == null) return false;
+      if (member == null) {
+        return false;
+      }
 
       String status = member.getStatus();
       return status.equals("administrator") || status.equals("creator");

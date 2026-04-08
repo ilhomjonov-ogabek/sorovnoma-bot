@@ -55,6 +55,9 @@ public class Poll {
 
   private Integer channelMessageId;
 
+  @Column(columnDefinition = "TEXT")
+  private String titleEntities;
+
 
   @PrePersist
   protected void onCreate() {

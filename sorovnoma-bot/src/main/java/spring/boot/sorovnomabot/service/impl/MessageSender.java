@@ -1,8 +1,13 @@
 package spring.boot.sorovnomabot.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.extern.log4j.Log4j;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChat;
@@ -13,6 +18,7 @@ import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageCa
 import org.telegram.telegrambots.meta.api.objects.Chat;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.MessageEntity;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -22,14 +28,18 @@ import spring.boot.sorovnomabot.entity.Poll;
 import spring.boot.sorovnomabot.repository.CandidateRepository;
 
 @Service
+@Log4j2
 public class MessageSender {
 
   private final TelegramBotConfig bot;
   private final CandidateRepository candidateRepository;
+  private final ObjectMapper objectMapper;
 
-  public MessageSender(TelegramBotConfig bot, CandidateRepository candidateRepository) {
+  public MessageSender(TelegramBotConfig bot, CandidateRepository candidateRepository,
+      ObjectMapper objectMapper) {
     this.bot = bot;
     this.candidateRepository = candidateRepository;
+    this.objectMapper = objectMapper;
   }
 
 
@@ -85,7 +95,6 @@ public class MessageSender {
 
       InlineKeyboardButton button = new InlineKeyboardButton();
       button.setText(candidate.getName() + " - " + formatted);
-      /*button.setCallbackData("vote" + "#" + candidateId + "#" + p.getId());*/
       button.setCallbackData("notApproved");
       rows.add(List.of(button));
     }
@@ -98,12 +107,23 @@ public class MessageSender {
     InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
     markup.setKeyboard(rows);
 
-    String caption = p.getTitle();
+    String caption = p.getTitle(); List<MessageEntity> entities = List.of();
+    try {
+      entities = objectMapper.readValue(
+          p.getTitleEntities(),
+          new TypeReference<>() {
+          }
+      );
+    } catch (JsonProcessingException e) {
+      log.error(e.getMessage());
+    }
+
 
     SendPhoto sendPhoto = new SendPhoto();
     sendPhoto.setChatId(chatId.toString());
     sendPhoto.setPhoto(new InputFile(p.getPictureId()));
     sendPhoto.setCaption(caption);
+    sendPhoto.setCaptionEntities(entities);
     sendPhoto.setReplyMarkup(markup);
 
     try {
