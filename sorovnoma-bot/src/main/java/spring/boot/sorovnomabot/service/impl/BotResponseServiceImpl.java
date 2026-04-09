@@ -152,16 +152,17 @@ public class BotResponseServiceImpl implements BotResponseService {
     SendMessage sendMessage = new SendMessage();
     sendMessage.setChatId(chatId.toString());
     List<String> channellsId = new ArrayList<>(poll.get().getChannellsId());
-    channellsId.add(channelId);
+    /*channellsId.add(channelId);*/
 
     List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-
-    for (String channels : channellsId) {
-      if (!isSubscribed(chatId, channels)) {
-        InlineKeyboardButton button = new InlineKeyboardButton();
-        button.setText("📢 Kanalga obuna bo'lish");
-        button.setUrl("https://t.me/" + channels.replace("@", ""));
-        rows.add(List.of(button));
+    if (!channellsId.isEmpty()) {
+      for (String channels : channellsId) {
+        if (!isSubscribed(chatId, channels)) {
+          InlineKeyboardButton button = new InlineKeyboardButton();
+          button.setText("📢 Kanalga obuna bo'lish");
+          button.setUrl("https://t.me/" + channels.replace("@", ""));
+          rows.add(List.of(button));
+        }
       }
     }
 
@@ -1049,15 +1050,16 @@ public class BotResponseServiceImpl implements BotResponseService {
     String pollId = split[1];
     Optional<Poll> poll = pollRepository.findById(Long.parseLong(pollId));
     List<String> channellsId = new ArrayList<>(poll.get().getChannellsId());
-    channellsId.add(channelId);
+    /*channellsId.add(channelId);*/
     List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-
-    for (String channel : channellsId) {
-      if (!isSubscribed(chatId, channel)) {
-        InlineKeyboardButton button = new InlineKeyboardButton();
-        button.setText("📢 Kanalga obuna bo'lish");
-        button.setUrl("https://t.me/" + channel.replace("@", ""));
-        rows.add(List.of(button));
+    if (!channellsId.isEmpty()) {
+      for (String channel : channellsId) {
+        if (!isSubscribed(chatId, channel)) {
+          InlineKeyboardButton button = new InlineKeyboardButton();
+          button.setText("📢 Kanalga obuna bo'lish");
+          button.setUrl("https://t.me/" + channel.replace("@", ""));
+          rows.add(List.of(button));
+        }
       }
     }
 
@@ -1074,10 +1076,11 @@ public class BotResponseServiceImpl implements BotResponseService {
       newMarkup.setKeyboard(rows);
 
       if (newText.equals(oldText)) {
-        AnswerCallbackQuery answer = new AnswerCallbackQuery();
-        answer.setCallbackQueryId(update.getCallbackQuery().getId());
+        EditMessageText answer = new EditMessageText();
+        answer.setChatId(chatId.toString());
+        answer.setMessageId(messageId);
         answer.setText("⚠️ Iltimos, avval barcha kanallarga obuna bo'ling!");
-        answer.setShowAlert(false);
+        messageSender.send((SendMessage) pressFinishSubscribe(chatId,pollId));
         return answer;
       }
 
@@ -1091,6 +1094,7 @@ public class BotResponseServiceImpl implements BotResponseService {
       return editMessage;
     }
 
+
     EditMessageText editMessage = new EditMessageText();
     editMessage.setChatId(chatId.toString());
     editMessage.setMessageId(messageId);
@@ -1098,6 +1102,42 @@ public class BotResponseServiceImpl implements BotResponseService {
     messageSender.sendPollToChannel(sendPoll(chatId, poll));
 
     return editMessage;
+  }
+
+  private BotApiMethod<?> pressFinishSubscribe(Long chatId, String pollId) {
+    Optional<Poll> poll = pollRepository.findById(Long.parseLong(pollId));
+    List<String> channellsId = new ArrayList<>(poll.get().getChannellsId());
+    List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+    if (!channellsId.isEmpty()) {
+      for (String channel : channellsId) {
+        if (!isSubscribed(chatId, channel)) {
+          InlineKeyboardButton button = new InlineKeyboardButton();
+          button.setText("📢 Kanalga obuna bo'lish");
+          button.setUrl("https://t.me/" + channel.replace("@", ""));
+          rows.add(List.of(button));
+        }
+      }
+    }
+
+
+      InlineKeyboardButton checkButton = new InlineKeyboardButton();
+      checkButton.setText("Obuna bo'ldim✅");
+      checkButton.setCallbackData("subscribe" + "#" + pollId);
+      rows.add(List.of(checkButton));
+
+      String newText = "❌ Ovoz berish uchun kanalga obuna bo'ling 👇";
+
+      InlineKeyboardMarkup newMarkup = new InlineKeyboardMarkup();
+      newMarkup.setKeyboard(rows);
+
+
+      log.info("User kanalga obuna emas: chatId={}", chatId);
+
+      SendMessage sendMessage = new SendMessage();
+      sendMessage.setChatId(chatId.toString());
+      sendMessage.setText(newText);
+      sendMessage.setReplyMarkup(newMarkup);
+      return sendMessage;
   }
 
   @Override
